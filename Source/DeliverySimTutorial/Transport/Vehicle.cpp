@@ -1,7 +1,10 @@
 #include "Vehicle.h"
 #include "ChaosVehicleMovementComponent.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
 
-AVehicle::AVehicle() {
+AVehicle::AVehicle()
+{
     CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
     CameraBoom->SetupAttachment(RootComponent);
 
@@ -9,57 +12,62 @@ AVehicle::AVehicle() {
     Camera->SetupAttachment(CameraBoom);
 }
 
-void AVehicle::BeginPlay() {
+void AVehicle::BeginPlay()
+{
     Super::BeginPlay();
-
-    
 }
 
-void AVehicle::SetupPlayerInputComponent(UInputComponent *PlayerInputComponent) {
+void AVehicle::SetupPlayerInputComponent(UInputComponent *PlayerInputComponent)
+{
     Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-    PlayerInputComponent->BindAxis("LookRight", this, &AVehicle::LookRight);
-    PlayerInputComponent->BindAxis("LookUp", this, &AVehicle::LookUp);
+    if (APlayerController *PlayerController = Cast<APlayerController>(GetController()))
+    {
+        if (UEnhancedInputLocalPlayerSubsystem *Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+        {
+            Subsystem->AddMappingContext(VehicleMappingContext, 0);
+        }
+    }
 
-    PlayerInputComponent->BindAxis("MoveForward", this, &AVehicle::MoveForward);
-    PlayerInputComponent->BindAxis("LurnLeft", this, &AVehicle::LurnLeft);
-    PlayerInputComponent->BindAxis("MoveBack", this, &AVehicle::MoveBack);
+    if (UEnhancedInputComponent *EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
+    {
+        EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AVehicle::Ride);
+        EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AVehicle::Look);
+        EnhancedInputComponent->BindAction(HandBrakeAction, ETriggerEvent::Started, this, &AVehicle::HandBrake);
+        EnhancedInputComponent->BindAction(HandBrakeAction, ETriggerEvent::Completed, this, &AVehicle::HandBrake);
 
-    PlayerInputComponent->BindAction("HandBrake", EInputEvent::IE_Pressed, this, &AVehicle::StartHandBrake);
-    PlayerInputComponent->BindAction("HandBrake", EInputEvent::IE_Released, this, &AVehicle::StopHandBrake);
+        RideActionBinding = &EnhancedInputComponent->BindActionValue(MoveAction);
+    }
 }
 
-void AVehicle::LookRight(const float Scale)
+void AVehicle::Ride(const FInputActionValue &Value)
 {
-    AddControllerYawInput(Scale);
+    const FVector2D CurrentValue = Value.Get<FVector2D>();
+
+    GetVehicleMovementComponent()->SetThrottleInput(CurrentValue.Y);
+    GetVehicleMovementComponent()->SetBrakeInput(-CurrentValue.Y);
+    GetVehicleMovementComponent()->SetSteeringInput(CurrentValue.X);
+}
+void AVehicle::Look(const FInputActionValue &Value)
+{
+    const FVector2D CurrentValue = Value.Get<FVector2D>();
+
+    if (GetController()) {
+        AddControllerYawInput(CurrentValue.X);
+        AddControllerPitchInput(CurrentValue.Y);
+    }
+}
+void AVehicle::HandBrake(const FInputActionValue &Value)
+{
+    const bool CurrentValue = Value.Get<bool>();
+    GetVehicleMovementComponent()->SetHandbrakeInput(CurrentValue);
 }
 
-void AVehicle::LookUp(const float Scale)
-{
-    AddControllerPitchInput(Scale);
-}
+float AVehicle::GetYRideAxis() const {
+    if (RideActionBinding) {
+        const FVector2D RideValue = RideActionBinding->GetValue().Get<FVector2D>();
+        return RideValue.Y;
+    }
 
-void AVehicle::MoveForward(const float Scale)
-{
-    GetVehicleMovementComponent()->SetThrottleInput(Scale);
-}
-
-void AVehicle::LurnLeft(const float Scale)
-{
-    GetVehicleMovementComponent()->SetSteeringInput(Scale);
-}
-
-void AVehicle::MoveBack(const float Scale)
-{
-    GetVehicleMovementComponent()->SetBrakeInput(-Scale);
-}
-
-void AVehicle::StartHandBrake()
-{
-    GetVehicleMovementComponent()->SetHandbrakeInput(true);
-}
-
-void AVehicle::StopHandBrake()
-{
-    GetVehicleMovementComponent()->SetHandbrakeInput(false);
+    return 0.f;
 }

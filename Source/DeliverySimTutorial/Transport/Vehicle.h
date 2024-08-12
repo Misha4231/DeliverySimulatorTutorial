@@ -6,8 +6,11 @@
 #include "WheeledVehiclePawn.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "InputActionValue.h"
 #include "Vehicle.generated.h"
 
+class UInputMappingContext;
+class UInputAction;
 /**
  * 
  */
@@ -28,27 +31,28 @@ public:
 	UCameraComponent *Camera;
 
 public:
-	UFUNCTION()
 	virtual void SetupPlayerInputComponent(UInputComponent *PlayerInputComponent) override;
 
-	UFUNCTION()
-	void LookRight(const float Scale);
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
+	UInputMappingContext *VehicleMappingContext;
 
-	UFUNCTION()
-	void LookUp(const float Scale);
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
+	UInputAction *MoveAction;
 
-	UFUNCTION()
-	void MoveForward(const float Scale);
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
+	UInputAction *LookAction;
 
-	UFUNCTION()
-	void LurnLeft(const float Scale);
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
+	UInputAction *HandBrakeAction;
 
-	UFUNCTION()
-	void MoveBack(const float Scale);
+	void Ride(const FInputActionValue &Value);
+	void Look(const FInputActionValue &Value);
+	void HandBrake(const FInputActionValue &Value);
 
-	UFUNCTION()
-	void StartHandBrake();
-
-	UFUNCTION()
-	void StopHandBrake();
+public:
+	UFUNCTION(BlueprintCallable, Category="Animation")
+	float GetYRideAxis() const;
+private:
+	struct FEnhancedInputActionValueBinding *RideActionBinding;
 };
